@@ -80,17 +80,18 @@ workshops (a controlled replacement for the upstream `registry.k8s.io/hpa-exampl
 image). Packaged to the same engineering standard as
 [platformfix/colour](https://github.com/platformfix/colour), minus a Helm chart.
 
-- `cmd/busyhttp/main.go` — wiring: reads `PORT`/`BUSY_SECONDS` env vars, sets
+- `cmd/busyhttp/main.go`: wiring. Reads `PORT`/`BUSY_SECONDS` env vars, sets
   up the `http.ServeMux`, handles graceful shutdown.
-- `internal/busyhttp/handler.go` — `NewHandler(duration time.Duration) http.HandlerFunc`
+- `internal/busyhttp/handler.go`: `NewHandler(duration time.Duration) http.HandlerFunc`
   (the busy-spin handler) and `Healthz` (liveness/readiness).
-- `Dockerfile` — distroless nonroot base image.
-- `kubernetes/` — raw `Deployment`/`Service` manifests (no Helm chart, deliberately).
-- `.goreleaser.yaml` + `.github/workflows/release.yml` — tagged releases
-  (`vX.Y.Z`) build multi-arch (amd64/arm64) cosign-signed images with SBOM +
-  SLSA provenance, published to `ghcr.io/platformfix/busyhttp` under both the
-  version tag and `:latest` (the two tags reference the identical multi-arch
-  manifest — a versioned release always produces a versioned image).
+- `Dockerfile`: distroless nonroot base image.
+- `kubernetes/`: raw `Deployment`/`Service` manifests (no Helm chart, deliberately).
+- `.goreleaser.yaml` + `.github/workflows/release.yml`: tagged releases
+  (`vX.Y.Z`) build multi-arch (amd64/arm64) cosign-signed images with SBOM
+  and SLSA provenance, published to `ghcr.io/platformfix/busyhttp` under
+  both the version tag and `:latest`. The two tags reference the identical
+  multi-arch manifest, so a versioned release always produces a versioned
+  image.
 
 Full history: the original design and implementation plan (now superseded,
 since the design spec was deleted once v0.1.0 shipped) are at
@@ -99,7 +100,7 @@ since the design spec was deleted once v0.1.0 shipped) are at
 ## Conventions & Patterns
 
 - **Never use `time.Sleep` in the handler.** The busy-spin (`for
-  time.Now().Before(deadline) {}`) is the entire point of this tool — it has
+  time.Now().Before(deadline) {}`) is the entire point of this tool: it has
   to show up as real CPU load an HPA can react to. `.github/workflows/e2e.yml`
   verifies this empirically by sampling `docker stats` CPU% during a request,
   not just checking elapsed wall-clock time.
@@ -107,7 +108,7 @@ since the design spec was deleted once v0.1.0 shipped) are at
   squash-merge only, no force-pushes/deletions, signed commits required.
   Required status checks: `build, vet, test`, `golangci-lint`, `hadolint`,
   `kubeconform`, `pr-lint`, `commit-lint`, `govulncheck`, `DCO`.
-- **Every commit needs `git commit -s`** (DCO sign-off) — enforced by both
+- **Every commit needs `git commit -s`** (DCO sign-off), enforced by both
   the `commit-lint` job and the org's DCO GitHub App.
 - **No Helm chart.** Deliberately excluded; `kubernetes/` ships raw manifests
   only.

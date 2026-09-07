@@ -14,7 +14,7 @@ A trivial HTTP server that burns CPU on every request: a demo load
 generator for Kubernetes HPA/autoscaling exercises.
 
 Inspired by [jpetazzo/busyhttp](https://github.com/jpetazzo/busyhttp),
-rebuilt in Go for Platform Fix's own Kubernetes workshops — replacing the
+rebuilt in Go for Platform Fix's own Kubernetes workshops, replacing the
 upstream `registry.k8s.io/hpa-example` (php-apache) image so every image
 used in training is one Platform Fix controls.
 
@@ -38,8 +38,8 @@ curl http://localhost:8080/
 ## How it works
 
 Every request to `/` busy-spins the CPU for `BUSY_SECONDS` (default `1`)
-before responding — a literal deadline-polling loop, not `time.Sleep`, so
-it shows up as real CPU load an HPA can react to.
+before responding. It is a literal deadline-polling loop, not `time.Sleep`,
+so it shows up as real CPU load an HPA can react to.
 
 - `BUSY_SECONDS`: how long to spin, in seconds (accepts fractions, e.g. `0.5`). Default `1`.
 - `PORT`: listen port. Default `8080`.
