@@ -1,0 +1,126 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Platform Fix
+#
+# GoReleaser config (v2). Builds the busyhttp binary, builds and pushes a
+# multi-arch (amd64/arm64) image to GHCR, and cosign keyless-signs the
+# pushed manifest digest — GitHub's own OIDC identity is the signing
+# identity (Fulcio/Rekor), no key material anywhere. release.yml attaches
+# the image SBOM and SLSA provenance as separate steps after this runs, and
+# holds the GitHub Release as a draft until those land, then publishes it.
+version: 2
+
+project_name: busyhttp
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: busyhttp
+    main: ./cmd/busyhttp
+    binary: busyhttp
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+    goos: [linux]
+    goarch: [amd64, arm64]
+
+archives:
+  - id: busyhttp
+    formats: [tar.gz]
+    name_template: "busyhttp_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - --yes
+    artifacts: checksum
+    output: true
+
+sboms:
+  - id: archive
+    artifacts: archive
+    cmd: syft
+    args: ["$artifact", "--output", "spdx-json=$document"]
+    documents:
+      - "${artifact}.sbom.spdx.json"
+
+dockers:
+  - id: busyhttp-amd64
+    goos: linux
+    goarch: amd64
+    dockerfile: Dockerfile
+    image_templates:
+      - "ghcr.io/platformfix/busyhttp:{{ .Version }}-amd64"
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+  - id: busyhttp-arm64
+    goos: linux
+    goarch: arm64
+    dockerfile: Dockerfile
+    image_templates:
+      - "ghcr.io/platformfix/busyhttp:{{ .Version }}-arm64"
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/arm64"
+
+docker_manifests:
+  - name_template: "ghcr.io/platformfix/busyhttp:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/platformfix/busyhttp:{{ .Version }}-amd64"
+      - "ghcr.io/platformfix/busyhttp:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/platformfix/busyhttp:latest"
+    image_templates:
+      - "ghcr.io/platformfix/busyhttp:{{ .Version }}-amd64"
+      - "ghcr.io/platformfix/busyhttp:{{ .Version }}-arm64"
+
+docker_signs:
+  - cmd: cosign
+    artifacts: manifests
+    args:
+      - "sign"
+      - "${artifact}"
+      - "--yes"
+
+changelog:
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 0
+    - title: Bug fixes
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 1
+    - title: Documentation
+      regexp: '^.*?docs(\(.+\))??!?:.+$'
+      order: 2
+    - title: Other changes
+      order: 999
+  filters:
+    exclude:
+      - '^test(\(.+\))?:'
+      - '^ci(\(.+\))?:'
+      - '^chore(\(.+\))?:'
+      - '^style(\(.+\))?:'
+      - '^build(\(.+\))?:'
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot-{{ .ShortCommit }}"
+
+release:
+  github:
+    owner: platformfix
+    name: busyhttp
+  draft: true
