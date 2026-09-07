@@ -56,6 +56,31 @@ jobs:
             exit 1
           }
 
+      - name: Verify the busy-spin actually pegs CPU (not just elapsed wall-clock time)
+        run: |
+          # A single 0.3s request is too short a window for `docker stats` to
+          # observe: its CPU% is smoothed over roughly a one-second sampling
+          # period, so a lone short burst reads back near 0% regardless of
+          # whether the handler busy-spins or sleeps. Fire several sequential
+          # requests to sustain CPU load for a few seconds instead, and take
+          # the max of several samples taken during that window.
+          ( for _ in $(seq 1 10); do curl -sf http://localhost:8081/ >/tmp/busy-response.txt; done ) &
+          LOOP_PID=$!
+          sleep 0.5
+          MAX_CPU=0
+          for _ in 1 2 3 4 5; do
+            CPU=$(docker stats --no-stream --format '{{.CPUPerc}}' busyhttp-e2e | tr -d '%')
+            CPU_INT=${CPU%.*}
+            echo "CPU sample: ${CPU}%"
+            if [ "${CPU_INT:-0}" -gt "$MAX_CPU" ]; then MAX_CPU="${CPU_INT:-0}"; fi
+          done
+          wait $LOOP_PID
+          echo "max CPU sampled during sustained load: ${MAX_CPU}%"
+          if [ "$MAX_CPU" -le 50 ]; then
+            echo "CPU usage during the busy-spin never exceeded ${MAX_CPU}%, expected >50% — a time.Sleep would show near-0%"
+            exit 1
+          fi
+
       - name: Verify /healthz
         run: |
           code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8081/healthz)
