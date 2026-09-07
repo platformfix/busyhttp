@@ -85,6 +85,7 @@ docker_manifests:
     image_templates:
       - "ghcr.io/platformfix/busyhttp:{{ .Version }}-amd64"
       - "ghcr.io/platformfix/busyhttp:{{ .Version }}-arm64"
+    skip_push: auto
 
 docker_signs:
   - cmd: cosign
@@ -124,3 +125,4 @@ release:
     owner: platformfix
     name: busyhttp
   draft: true
+  prerelease: auto
