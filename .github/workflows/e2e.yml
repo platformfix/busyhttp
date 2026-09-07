@@ -1,0 +1,70 @@
+name: e2e
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: build --single-target --snapshot --clean -o busyhttp
+
+      - name: Build the image
+        run: docker build -t busyhttp:ci .
+
+      - name: Run the container
+        run: |
+          docker run -d --rm -p 8081:8080 -e BUSY_SECONDS=0.3 --name busyhttp-e2e busyhttp:ci
+          sleep 2
+
+      - name: Verify the request actually burns CPU for ~0.3s
+        run: |
+          start_ns=$(date +%s%N)
+          body=$(curl -sf http://localhost:8081/)
+          end_ns=$(date +%s%N)
+          elapsed_ns=$((end_ns - start_ns))
+          echo "$body"
+          echo "elapsed: ${elapsed_ns}ns"
+          if [ "$elapsed_ns" -lt 300000000 ]; then
+            echo "request returned in ${elapsed_ns}ns, expected at least 300000000ns (0.3s)"
+            exit 1
+          fi
+          echo "$body" | grep -q "0.3" || {
+            echo "response did not mention the configured duration"
+            exit 1
+          }
+
+      - name: Verify /healthz
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8081/healthz)
+          [ "$code" = "200" ] || { echo "expected 200 from /healthz, got $code"; exit 1; }
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker logs busyhttp-e2e || true
+
+      - name: Clean up
+        if: always()
+        run: docker stop busyhttp-e2e || true
