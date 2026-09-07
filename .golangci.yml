@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Platform Fix
+#
+# golangci-lint v2 config. Default linter set (errcheck, govet, ineffassign,
+# staticcheck, unused) with the house idioms excluded — deferred Close and
+# best-effort Fprint to std streams are intentionally unchecked.
+version: "2"
+
+linters:
+  settings:
+    errcheck:
+      exclude-functions:
+        - (io.Closer).Close
+        - (*os.File).Close
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+
+  exclusions:
+    generated: lax
+    presets:
+      - std-error-handling
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+          - staticcheck
+          - govet
