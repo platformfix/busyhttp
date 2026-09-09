@@ -13,11 +13,6 @@
 A trivial HTTP server that burns CPU on every request: a demo load
 generator for Kubernetes HPA/autoscaling exercises.
 
-Inspired by [jpetazzo/busyhttp](https://github.com/jpetazzo/busyhttp),
-rebuilt in Go for Platform Fix's own Kubernetes workshops, replacing the
-upstream `registry.k8s.io/hpa-example` (php-apache) image so every image
-used in training is one Platform Fix controls.
-
 ## Quickstart
 
 Run the raw demo:
